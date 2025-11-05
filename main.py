@@ -163,18 +163,18 @@ def get_data_loaders(batch_size=32, num_workers=4, use_weighted_sampler=False):
     
     # Create datasets
     train_dataset = Four4All(
-        csv_file='fer2013/data/train_labels.csv',
-        img_dir='fer2013/data/train',
+        csv_file='rafdb/train_labels.csv',
+        img_dir='rafdb/train',
         transform=train_transform
     )
     val_dataset = Four4All(
-        csv_file='fer2013/data/valid_labels.csv',
-        img_dir='fer2013/data/valid/',
+        csv_file='rafdb/valid_labels.csv',
+        img_dir='rafdb/valid/',
         transform=val_transform
     )
     test_dataset = Four4All(
-        csv_file='fer2013/data/test_labels.csv',
-        img_dir='fer2013/data/test',
+        csv_file='rafdb/test_labels.csv',
+        img_dir='rafdb/test',
         transform=val_transform
     )
     
@@ -265,7 +265,7 @@ def load_checkpoint(model, optimizer, scheduler, path):
 # ==================== Training Function ====================
 
 def train_model(model, train_loader, val_loader, start_epoch=0, num_epochs=80,
-                checkpoint_path='fer2013/checkpoints/checkpoint_epoch_{}.pth',
+                checkpoint_path='rafdb/checkpoints/checkpoint_epoch_{}.pth',
                 use_focal_loss=True, focal_gamma=2.0):
     """
     Enhanced training loop with all improvements
@@ -446,7 +446,7 @@ def train_model(model, train_loader, val_loader, start_epoch=0, num_epochs=80,
         if val_f1 > best_val_f1:
             best_val_f1 = val_f1
             patience_counter = 0
-            torch.save(model.state_dict(), 'fer2013/best_hybrid_model.pth')
+            torch.save(model.state_dict(), 'rafdb/best_hybrid_model.pth')
             print(f"  ✓ Best model saved (Val F1: {val_f1:.4f})")
         else:
             patience_counter += 1
@@ -470,15 +470,15 @@ def train_model(model, train_loader, val_loader, start_epoch=0, num_epochs=80,
         'Train_F1': train_f1_scores,
         'Val_F1': val_f1_scores
     })
-    history_df.to_csv('fer2013/training_history.csv', index=False)
-    print("\n✓ Training history saved to fer2013/training_history.csv")
+    history_df.to_csv('rafdb/training_history.csv', index=False)
+    print("\n✓ Training history saved to rafdb/training_history.csv")
     
     return model, train_losses, val_losses, train_accuracies, val_accuracies, train_f1_scores, val_f1_scores
 
 
 # ==================== Evaluation Function ====================
 
-def evaluate_model(model, test_loader, save_path='fer2013'):
+def evaluate_model(model, test_loader, save_path='rafdb'):
     """
     Comprehensive model evaluation with detailed metrics
     """
@@ -577,7 +577,7 @@ def evaluate_model(model, test_loader, save_path='fer2013'):
 # ==================== Plotting Functions ====================
 
 def plot_training_curves(train_losses, val_losses, train_accuracies, val_accuracies,
-                        train_f1, val_f1, save_path='fer2013'):
+                        train_f1, val_f1, save_path='rafdb'):
     """Plot comprehensive training curves"""
     
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
@@ -620,8 +620,8 @@ def plot_training_curves(train_losses, val_losses, train_accuracies, val_accurac
 
 if __name__ == "__main__":
     # Create necessary directories
-    os.makedirs('fer2013/checkpoints', exist_ok=True)
-    os.makedirs('fer2013', exist_ok=True)
+    os.makedirs('rafdb/checkpoints', exist_ok=True)
+    os.makedirs('rafdb', exist_ok=True)
     
     print("\n" + "="*70)
     print("HYBRID CNN-TRANSFORMER EMOTION RECOGNITION")
@@ -659,25 +659,25 @@ if __name__ == "__main__":
         val_loader=val_loader,
         start_epoch=start_epoch,
         num_epochs=80,
-        checkpoint_path='fer2013/checkpoints/checkpoint_epoch_{}.pth',
+        checkpoint_path='rafdb/checkpoints/checkpoint_epoch_{}.pth',
         use_focal_loss=True,  # Use Focal Loss for class imbalance
         focal_gamma=2.0
     )
     
     # ============ Load Best Model ============
     print("\nLoading best model for final evaluation...")
-    model.load_state_dict(torch.load('fer2013/best_hybrid_model.pth'))
+    model.load_state_dict(torch.load('rafdb/best_hybrid_model.pth'))
     
     # ============ Evaluate on Test Set ============
-    acc, prec, rec, f1, cm = evaluate_model(model, test_loader, save_path='fer2013')
+    acc, prec, rec, f1, cm = evaluate_model(model, test_loader, save_path='rafdb')
     
     # ============ Plot Training Curves ============
     plot_training_curves(train_losses, val_losses, train_accuracies, 
-                        val_accuracies, train_f1, val_f1, save_path='fer2013')
+                        val_accuracies, train_f1, val_f1, save_path='rafdb')
     
     # ============ Save Final Model ============
-    torch.save(model.state_dict(), 'fer2013/hybrid_model_final.pth')
-    print("\n✓ Final model saved to fer2013/hybrid_model_final.pth")
+    torch.save(model.state_dict(), 'rafdb/hybrid_model_final.pth')
+    print("\n✓ Final model saved to rafdb/hybrid_model_final.pth")
     
     print("\n" + "="*70)
     print("TRAINING COMPLETE!")
