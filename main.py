@@ -205,7 +205,7 @@ def get_data_loaders(batch_size=32, num_workers=4, use_weighted_sampler=False):
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=(train_sampler is None),  # Don't shuffle if using sampler
+        shuffle=(train_sampler is None),
         sampler=train_sampler,
         num_workers=num_workers,
         pin_memory=True
@@ -629,7 +629,7 @@ if __name__ == "__main__":
     
     # ============ Load Data ============
     train_loader, val_loader, test_loader = get_data_loaders(
-        batch_size=16,  # Reduced for memory efficiency with Swin Transformer
+        batch_size=32,
         num_workers=4,
         use_weighted_sampler=False  # Set to True for weighted sampling
     )

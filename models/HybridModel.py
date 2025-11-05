@@ -347,10 +347,6 @@ class HybridEmotionRecognition(nn.Module):
         )
         swin_dim = self.swin.num_features  # 768 for swin_tiny
         
-        # Enable gradient checkpointing for memory efficiency
-        if use_gradient_checkpointing and hasattr(self.swin, 'set_grad_checkpointing'):
-            self.swin.set_grad_checkpointing(enable=True)
-        
         # ============ Projection Layers ============
         # Project both embeddings to common dimension
         self.cnn_projection = nn.Sequential(
