@@ -307,7 +307,6 @@ def train_model(model, train_loader, val_loader, start_epoch=0, num_epochs=80,
         mode='min',
         factor=0.5,
         patience=5,
-        verbose=True,
         min_lr=1e-7
     )
     
