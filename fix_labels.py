@@ -1,8 +1,8 @@
 import pandas as pd
 
 # 📌 Replace this with your actual file path
-input_csv = "raf_db/data/val_labels.csv"
-output_csv = "raf_db/data/new_labels/val_labels.csv"
+input_csv = "rafdb/train_labels.csv"
+output_csv = "rafdb/new_labels/train_labels.csv"
 
 # 🗺️ Label map: RAF-DB ➝ FER2013 format
 raf_to_fer_map = {
