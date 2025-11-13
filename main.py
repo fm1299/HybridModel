@@ -1,8 +1,3 @@
-"""
-Enhanced Training Script for Hybrid Emotion Recognition Model
-Includes all recommended improvements for class imbalance handling
-"""
-
 print("Starting Hybrid Model training script...")
 print("Importing necessary libraries...")
 

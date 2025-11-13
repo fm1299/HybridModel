@@ -1,20 +1,3 @@
-"""
-Hybrid CNN-Transformer Model for Facial Emotion Recognition
-ResEmoteNet + Swin Transformer Tiny with Adaptive Multi-Head Attention Fusion
-
-Author: Fabrizio Miguel Mattos Cahui
-Institution: UNSA - Universidad Nacional de San Agustín de Arequipa
-Date: November 2025
-
-This implementation includes all recommended improvements:
-- Residual dropout for better regularization
-- Alternative aggregation strategies
-- Attention visualization support
-- Gradient checkpointing for memory efficiency
-- Per-branch feature normalization
-- Enhanced parameter counting
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -648,48 +631,3 @@ def print_model_summary(model: HybridEmotionRecognition):
     print(f"  Aggregation Strategy:           {model.aggregation}")
     
     print("="*70)
-
-
-
-# ==================== Example Usage ====================
-
-
-if __name__ == "__main__":
-    # Create model
-    model = create_hybrid_model(
-        num_classes=7,
-        embed_dim=512,
-        num_heads=8,
-        dropout=0.2,
-        pretrained_swin=True,
-        aggregation='mean'
-    )
-    
-    # Print summary
-    print_model_summary(model)
-    
-    # Test forward pass
-    batch_size = 4
-    dummy_input = torch.randn(batch_size, 3, 224, 224)
-    
-    print(f"\nTesting forward pass with input shape: {dummy_input.shape}")
-    
-    # Standard forward pass
-    logits = model(dummy_input)
-    print(f"Output logits shape: {logits.shape}")
-    
-    # Forward pass with embeddings and attention
-    logits, embeddings, attention = model(
-        dummy_input, 
-        return_embeddings=True, 
-        return_attention=True
-    )
-    print(f"\nEmbeddings dictionary keys: {embeddings.keys()}")
-    print(f"Fused embedding shape: {embeddings['fused'].shape}")
-    print(f"Attention weights shape: {attention.shape}")
-    
-    # Get attention maps for visualization
-    attn_maps = model.get_attention_maps(dummy_input)
-    print(f"\nAttention maps shape: {attn_maps.shape}")
-    print(f"Sample attention matrix (first image):")
-    print(attn_maps[0])

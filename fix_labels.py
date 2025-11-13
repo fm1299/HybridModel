@@ -6,12 +6,12 @@ output_csv = "rafdb/new_labels/train_labels.csv"
 
 # 🗺️ Label map: RAF-DB ➝ FER2013 format
 raf_to_fer_map = {
-    1: 5,  # Surprise ➝ 5
-    2: 2,  # Fear ➝ 2
+    6: 0,  # Angry ➝ 0
     3: 1,  # Disgust ➝ 1
+    2: 2,  # Fear ➝ 2
     4: 3,  # Happy ➝ 3
     5: 4,  # Sad ➝ 4
-    6: 0,  # Angry ➝ 0
+    1: 5,  # Surprise ➝ 5
     7: 6   # Neutral ➝ 6
 }
 
