@@ -1,0 +1,70 @@
+# config.yaml
+
+experiment:
+  name: "hybrid_rafdb_exp1"
+  seed: 42
+  output_dir: "rafdb"
+
+data:
+  train_csv: "rafdb/train_labels.csv"
+  train_dir: "rafdb/train"
+  val_csv: "rafdb/valid_labels.csv"
+  val_dir: "rafdb/valid"
+  test_csv: "rafdb/test_labels.csv"
+  test_dir: "rafdb/test"
+  batch_size: 16
+  num_workers: 4
+  class_names: ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
+
+augmentation:
+  img_size: 224
+  grayscale: true
+  horizontal_flip_prob: 0.5
+  rotation_deg: 15
+  color_jitter:
+    brightness: 0.2
+    contrast: 0.2
+    saturation: 0.1
+  affine:
+    translate: 0.1
+    scale: [0.9, 1.1]
+
+model:
+  type: "HybridEmotionRecognition"
+  num_classes: 7
+  embed_dim: 512
+  num_heads: 8
+  dropout: 0.2
+  pretrained_swin: true
+  aggregation: "mean"
+  backbone: "ResEmoteNetPaper"
+
+optimizer:
+  type: "AdamW"
+  lr: 0.0001
+  weight_decay: 0.0001
+  betas: [0.9, 0.999]
+
+loss:
+  type: "FocalLoss"  # Options: "FocalLoss", "CrossEntropyLoss"
+  gamma: 2.0
+  use_class_weights: true
+
+scheduler:
+  type: "ReduceLROnPlateau"
+  factor: 0.5
+  patience: 5
+  min_lr: 0.0000001
+
+training:
+  epochs: 80
+  patience: 15
+  gradient_clip: 1.0
+  resume_checkpoint: null
+
+evaluation:
+  save_best_model: true
+  save_final_model: true
+  metrics: ["accuracy", "precision", "recall", "f1"]
+  save_confusion_matrix: true
+  plot_training_curves: true

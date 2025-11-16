@@ -9,171 +9,145 @@ from typing import Dict, Tuple, Optional, Union
 
 # ==================== ResEmoteNet Components ====================
 
-
 class SqueezeExcitationBlock(nn.Module):
-    """
-    Squeeze and Excitation Block for channel attention
-    
-    Args:
-        channels: Number of input channels
-        reduction: Reduction ratio for bottleneck (default: 16)
-    """
     def __init__(self, channels: int, reduction: int = 16):
-        super(SqueezeExcitationBlock, self).__init__()
+        super().__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.fc1 = nn.Linear(channels, channels // reduction, bias=False)
-        self.gelu = nn.GELU()  # Changed from ReLU to GELU for consistency
+        self.relu = nn.ReLU(inplace=True)
         self.fc2 = nn.Linear(channels // reduction, channels, bias=False)
         self.sigmoid = nn.Sigmoid()
-    
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         b, c, _, _ = x.size()
-        # Squeeze: global information embedding
         z = self.avg_pool(x).view(b, c)
-        # Excitation: adaptive recalibration
         s = self.fc1(z)
-        s = self.gelu(s)
+        s = self.relu(s)
         s = self.fc2(s)
         s = self.sigmoid(s)
         s = s.view(b, c, 1, 1)
         return x * s.expand_as(x)
 
-
-
 class ResidualBlock(nn.Module):
-    """
-    Residual Block with skip connection
-    
-    Args:
-        in_channels: Number of input channels
-        out_channels: Number of output channels
-        stride: Stride for spatial downsampling (default: 1)
-    """
     def __init__(self, in_channels: int, out_channels: int, stride: int = 1):
-        super(ResidualBlock, self).__init__()
-        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, 
-                               stride=stride, padding=1, bias=False)
+        super().__init__()
+        self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
-        self.gelu = nn.GELU()  # Changed from ReLU to GELU
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3,
-                               stride=1, padding=1, bias=False)
+        self.relu = nn.ReLU(inplace=True)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
-        
-        # Shortcut connection
         self.shortcut = nn.Sequential()
         if stride != 1 or in_channels != out_channels:
             self.shortcut = nn.Sequential(
-                nn.Conv2d(in_channels, out_channels, kernel_size=1,
-                         stride=stride, bias=False),
+                nn.Conv2d(in_channels, out_channels, kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(out_channels)
             )
-    
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x):
         identity = self.shortcut(x)
-        out = self.conv1(x)
-        out = self.bn1(out)
-        out = self.gelu(out)
-        out = self.conv2(out)
-        out = self.bn2(out)
+        out = self.relu(self.bn1(self.conv1(x)))
+        out = self.bn2(self.conv2(out))
         out += identity
-        out = self.gelu(out)
+        out = self.relu(out)
         return out
 
-
-
 class ResEmoteNetBackbone(nn.Module):
-    """
-    ResEmoteNet backbone without classification head
-    Extracts 1024-dimensional feature embeddings
-    
-    Architecture based on:
-    Roy et al. "ResEmoteNet: Bridging Accuracy and Loss Reduction 
-    in Facial Emotion Recognition"
-    
-    Args:
-        input_channels: Number of input channels (default: 3 for RGB)
-    """
-    def __init__(self, input_channels: int = 3):
-        super(ResEmoteNetBackbone, self).__init__()
-        
-        # Initial Convolutional Network (3 layers)
-        self.conv1 = nn.Conv2d(input_channels, 64, kernel_size=3, 
-                               stride=1, padding=1, bias=False)
+    def __init__(self, input_channels=3):
+        super().__init__()
+        self.conv1 = nn.Conv2d(input_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
-        self.gelu1 = nn.GELU()
-        self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2)  # 224 -> 112
-        
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, 
-                               stride=1, padding=1, bias=False)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(128)
-        self.gelu2 = nn.GELU()
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)  # 112 -> 56
-        
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=3,
-                               stride=1, padding=1, bias=False)
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn3 = nn.BatchNorm2d(256)
-        self.gelu3 = nn.GELU()
-        self.maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2)  # 56 -> 28
-        
-        # Squeeze and Excitation Block
+        self.maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.se_block = SqueezeExcitationBlock(256, reduction=16)
-        
-        # Residual Blocks (256 -> 512 -> 1024)
-        self.res_block1 = ResidualBlock(256, 256, stride=1)   # 28 -> 28
-        self.res_block2 = ResidualBlock(256, 512, stride=2)   # 28 -> 14
-        self.res_block3 = ResidualBlock(512, 1024, stride=2)  # 14 -> 7
-        
-        # Adaptive Average Pooling
-        self.adaptive_pool = nn.AdaptiveAvgPool2d((1, 1))
-        
+        self.res_block1 = ResidualBlock(256, 512, stride=2)
+        self.res_block2 = ResidualBlock(512, 1024, stride=2)
+        self.res_block3 = ResidualBlock(1024, 2048, stride=2)
+        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
         self._initialize_weights()
-    
     def _initialize_weights(self):
-        """Initialize weights using Kaiming initialization"""
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', 
-                                       nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
-    
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """
-        Args:
-            x: Input tensor (batch_size, 3, 224, 224)
-        Returns:
-            features: Feature embeddings (batch_size, 1024)
-        """
-        # Convolutional layers
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.gelu1(x)
+    def forward(self, x):
+        x = self.relu(self.bn1(self.conv1(x)))
         x = self.maxpool1(x)
-        
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = self.gelu2(x)
+        x = self.relu(self.bn2(self.conv2(x)))
         x = self.maxpool2(x)
-        
-        x = self.conv3(x)
-        x = self.bn3(x)
-        x = self.gelu3(x)
+        x = self.relu(self.bn3(self.conv3(x)))
         x = self.maxpool3(x)
-        
-        # SE block for channel attention
         x = self.se_block(x)
-        
-        # Residual blocks with progressive downsampling
         x = self.res_block1(x)
         x = self.res_block2(x)
         x = self.res_block3(x)
+        x = self.global_pool(x)
+        x = torch.flatten(x, 1)  # (batch, 2048)
+        return x
+
+
+
+# class ResEmoteNetBackbone(nn.Module):
+#     """
+#     Paper-faithful ResEmoteNet backbone for hybrid models.
+#     Outputs 2048-dimensional features, matching the original architecture.
+#     """
+#     def __init__(self, input_channels: int = 3):
+#         super().__init__()
+#         self.conv1 = nn.Conv2d(input_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
+#         self.bn1 = nn.BatchNorm2d(64)
+#         self.relu = nn.ReLU(inplace=True)
+#         self.maxpool1 = nn.MaxPool2d(2, 2) # 224 -> 112
+
+#         self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, bias=False)
+#         self.bn2 = nn.BatchNorm2d(128)
+#         self.maxpool2 = nn.MaxPool2d(2, 2) # 112 -> 56
         
-        # Global average pooling
-        x = self.adaptive_pool(x)
-        x = torch.flatten(x, 1)
-        
-        return x  # (batch_size, 1024)
+#         self.conv3 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1, bias=False)
+#         self.bn3 = nn.BatchNorm2d(256)
+#         self.maxpool3 = nn.MaxPool2d(2, 2) # 56 -> 28
+
+#         self.se_block = SqueezeExcitationBlock(256, reduction=16)
+
+#         # Residual blocks: 256→512 (stride 2), 512→1024 (stride 2), 1024→2048 (stride 2)
+#         self.res_block1 = ResidualBlock(256, 512, stride=2)   # 28→14
+#         self.res_block2 = ResidualBlock(512, 1024, stride=2)  # 14→7
+#         self.res_block3 = ResidualBlock(1024, 2048, stride=2) # 7→4
+
+#         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+
+#         self._initialize_weights()
+
+#     def _initialize_weights(self):
+#         for m in self.modules():
+#             if isinstance(m, nn.Conv2d):
+#                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+#             elif isinstance(m, nn.BatchNorm2d):
+#                 nn.init.constant_(m.weight, 1)
+#                 nn.init.constant_(m.bias, 0)
+
+#     def forward(self, x):
+#         x = self.relu(self.bn1(self.conv1(x)))
+#         x = self.maxpool1(x)
+#         x = self.relu(self.bn2(self.conv2(x)))
+#         x = self.maxpool2(x)
+#         x = self.relu(self.bn3(self.conv3(x)))
+#         x = self.maxpool3(x)
+#         x = self.se_block(x)
+
+#         x = self.res_block1(x)
+#         x = self.res_block2(x)
+#         x = self.res_block3(x)
+#         x = self.global_pool(x)
+#         x = torch.flatten(x, 1)  # (batch, 2048)
+#         return x
+
+
 
 
 
@@ -319,7 +293,7 @@ class HybridEmotionRecognition(nn.Module):
         
         # ============ Branch 1: ResEmoteNet (CNN) ============
         self.resemotenet = ResEmoteNetBackbone(input_channels=3)
-        resemotenet_dim = 1024  # Output dimension of ResEmoteNet
+        resemotenet_dim = 2048  # Output dimension of ResEmoteNet
         
         # ============ Branch 2: Swin Transformer Tiny ============
         # Load Swin Transformer Tiny (expects 224x224 images)
