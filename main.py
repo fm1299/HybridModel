@@ -41,6 +41,32 @@ def seed_worker(worker_id):
     np.random.seed(worker_seed)
     random.seed(worker_seed)
 
+# ==================== Focal Loss Implementation ====================
+class FocalLoss(nn.Module):
+    def __init__(self, alpha=None, gamma=2.0, reduction='mean', ignore_index=-100):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        self.reduction = reduction
+        self.ignore_index = ignore_index
+        self.ce = nn.CrossEntropyLoss(reduction='none', ignore_index=ignore_index)
+    def forward(self, inputs, targets):
+        ce_loss = self.ce(inputs, targets)
+        pt = torch.exp(-ce_loss)
+        focal_term = (1 - pt) ** self.gamma
+        focal_loss = focal_term * ce_loss
+        if self.alpha is not None:
+            if self.alpha.device != targets.device:
+                self.alpha = self.alpha.to(targets.device)
+            alpha_t = self.alpha.gather(0, targets)
+            focal_loss = alpha_t * focal_loss
+        if self.reduction == 'mean':
+            return focal_loss.mean()
+        elif self.reduction == 'sum':
+            return focal_loss.sum()
+        else:
+            return focal_loss
+
 # ==================== Helper Functions ====================
 def compute_class_weights(train_loader, num_classes=7):
     print("\nComputing class weights from training data...")
@@ -124,22 +150,62 @@ def get_data_loaders(config, use_weighted_sampler=False):
     )
     return train_loader, val_loader, test_loader
 
+def plot_training_curves(train_losses, val_losses, test_losses, train_accs, val_accs, test_accs, config):
+    out_dir = config['experiment']['output_dir']
+    plt.figure(figsize=(15, 5))
+    plt.subplot(1, 2, 1)
+    plt.plot(train_losses, label="Train")
+    plt.plot(val_losses, label="Val")
+    plt.plot(test_losses, label="Test")
+    plt.xlabel("Epoch")
+    plt.ylabel("Loss")
+    plt.title("Loss Curves")
+    plt.legend()
+    plt.subplot(1, 2, 2)
+    plt.plot(train_accs, label="Train")
+    plt.plot(val_accs, label="Val")
+    plt.plot(test_accs, label="Test")
+    plt.xlabel("Epoch")
+    plt.ylabel("Accuracy")
+    plt.title("Accuracy Curves")
+    plt.legend()
+    plt.tight_layout()
+    save_path = os.path.join(out_dir, "training_curves.png")
+    plt.savefig(save_path)
+    plt.close()
+    print(f"✓ Training curves saved to {save_path}")
+
 # ==================== Main Training Function ====================
 def train_model(model, train_loader, val_loader, test_loader, config, start_epoch=0):
     patience = config['training']['patience']
     num_epochs = config['training']['epochs']
-    # use_focal_loss = (config['loss']['type'] == "FocalLoss")
-    # focal_gamma = config['loss'].get('gamma', 2.0)
+    use_focal_loss = (config['loss']['type'] == "FocalLoss")
+    focal_gamma = config['loss'].get('gamma', 2.0)
 
     class_weights = compute_class_weights(train_loader, num_classes=config['model']['num_classes']).to(device)
-    criterion = nn.CrossEntropyLoss(weight=class_weights)
-    optimizer = optim.SGD(model.parameters(), lr=config['optimizer']['lr'], momentum=config['optimizer']['momentum'], weight_decay=config['optimizer']['weight_decay'])
-    # optimizer = optim.AdamW(
-    #     model.parameters(),
-    #     lr=config['optimizer']['lr'],
-    #     weight_decay=config['optimizer']['weight_decay'],
-    #     betas=tuple(config['optimizer']['betas'])
-    # )
+    if use_focal_loss:
+        criterion = FocalLoss(alpha=class_weights, gamma=focal_gamma, reduction='mean')
+    else:
+        criterion = nn.CrossEntropyLoss(weight=class_weights)
+
+    opt_type = config['optimizer']['type']
+    if opt_type == 'SGD':
+        optimizer = optim.SGD(
+            model.parameters(),
+            lr=config['optimizer']['lr'],
+            momentum=config['optimizer']['momentum'],
+            weight_decay=config['optimizer']['weight_decay']
+        )
+    elif opt_type == 'AdamW':
+        optimizer = optim.AdamW(
+            model.parameters(),
+            lr=config['optimizer']['lr'],
+            weight_decay=config['optimizer']['weight_decay'],
+            betas=tuple(config['optimizer']['betas'])
+        )
+    else:
+        raise NotImplementedError(f"Optimizer type '{opt_type}' is not recognized (use 'SGD' or 'AdamW').")
+
     scheduler = ReduceLROnPlateau(
         optimizer, mode='min', factor=config['scheduler']['factor'],
         patience=config['scheduler']['patience'], min_lr=config['scheduler']['min_lr']
@@ -217,6 +283,7 @@ def train_model(model, train_loader, val_loader, test_loader, config, start_epoc
             patience_counter = 0
         else:
             patience_counter += 1
+            print(f"Patience increased to {patience_counter}/{patience}")
         if patience_counter >= patience:
             print(f"\nEarly stopping triggered! (Best val @ epoch {best_val_epoch})")
             break
@@ -224,9 +291,11 @@ def train_model(model, train_loader, val_loader, test_loader, config, start_epoc
     os.makedirs(out_dir, exist_ok=True)
     torch.save(best_model_state, os.path.join(out_dir, 'best_hybrid_model.pth'))
     print(f"✓ Best model saved to {out_dir}/best_hybrid_model.pth")
+    # Save training curves
+    plot_training_curves(train_losses, val_losses, test_losses, train_accuracies, val_accuracies, test_accuracies, config)
     return train_losses, val_losses, test_losses, train_accuracies, val_accuracies, test_accuracies, best_val_epoch
 
-# ==================== Final Test Evaluation ====================
+# ==================== Final Test Evaluation + Percentage Matrix ====================
 def final_test_evaluation(model, test_loader, config):
     print("\n" + "="*70)
     print("FINAL TEST EVALUATION (best model)")
@@ -254,18 +323,19 @@ def final_test_evaluation(model, test_loader, config):
     print(f"  Precision: {prec:.4f}")
     print(f"  Recall:    {rec:.4f}")
     print(f"  F1-score:  {f1:.4f}")
-    # --- Confusion matrix
+    # --- Confusion matrix (percentages per row)
     cm = confusion_matrix(all_labels, all_preds)
+    cm_percent = cm.astype('float') / cm.sum(axis=1, keepdims=True) * 100
     plt.figure(figsize=(8, 6))
-    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+    sns.heatmap(cm_percent, annot=True, fmt='.2%', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
     plt.xlabel('Predicted')
     plt.ylabel('True')
-    plt.title("Test Confusion Matrix")
+    plt.title("Test Confusion Matrix (%)")
     plt.tight_layout()
     cm_path = os.path.join(config['experiment']['output_dir'], 'confusion_matrix_hybrid.png')
     plt.savefig(cm_path)
     plt.close()
-    print(f"✓ Confusion matrix saved to {cm_path}")
+    print(f"✓ Confusion matrix (percent) saved to {cm_path}")
 
 # ==================== Main Execution ====================
 if __name__ == "__main__":
@@ -290,7 +360,7 @@ if __name__ == "__main__":
         model, train_loader, val_loader, test_loader, config, start_epoch=start_epoch
     )
     out_dir = config['experiment']['output_dir']
-    # Evaluation of best model on test set (full metrics + confusion matrix)
+    # Evaluation of best model on test set (full metrics + percent confusion matrix)
     best_model_path = os.path.join(out_dir, 'best_hybrid_model.pth')
     model.load_state_dict(torch.load(best_model_path))
     final_test_evaluation(model, test_loader, config)
