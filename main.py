@@ -68,48 +68,46 @@ class FocalLoss(nn.Module):
             return focal_loss
 
 # ==================== Helper Functions ====================
-def compute_class_weights(train_loader, num_classes=7):
-    print("\nComputing class weights from training data...")
-    class_counts = torch.zeros(num_classes)
-    for _, labels in tqdm(train_loader, desc="Counting classes"):
-        for label in labels:
-            class_counts[label] += 1
-    total_samples = class_counts.sum()
-    class_weights = total_samples / (num_classes * class_counts)
-    class_weights = class_weights / class_weights.sum() * num_classes
-    print("\nClass Distribution in Training Set:")
-    print("-" * 60)
-    for i, (name, count, weight) in enumerate(zip(class_names, class_counts, class_weights)):
-        print(f"{name:10s}: {int(count):6d} samples ({count/total_samples*100:5.2f}%) | Weight: {weight:.4f}")
-    print("-" * 60)
-    return class_weights
+def build_transform(config, is_train=True):
+    aug = config['augmentation']
+    t = [
+        transforms.Resize((aug['img_size'], aug['img_size'])),
+        transforms.Grayscale(num_output_channels=3) if aug.get('grayscale', True) else transforms.Lambda(lambda x: x),
+        transforms.RandomHorizontalFlip(aug.get('horizontal_flip_prob', 0.5)),
+        transforms.RandomRotation(aug.get('rotation_deg', 15))
+    ]
+    cj = aug.get('color_jitter', {})
+    if cj:
+        t.append(transforms.ColorJitter(
+            brightness=cj.get('brightness', 0.0),
+            contrast=cj.get('contrast', 0.0),
+            saturation=cj.get('saturation', 0.0)
+        ))
+    aff = aug.get('affine', {})
+    if aff:
+        t.append(transforms.RandomAffine(
+            degrees=0,
+            translate=(aff.get('translate', 0), aff.get('translate', 0)),
+            scale=tuple(aff.get('scale', [1.0, 1.0]))
+        ))
+    t.append(transforms.ToTensor())
+    t.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+    # Extra augment: random erasing for train only
+    extra = aug.get('extra_aug', {})
+    if is_train and extra.get('random_erasing', False):
+        t.append(transforms.RandomErasing(
+            p=extra.get('p_erasing', 0.5),
+            scale=tuple(extra.get('scale', [0.02, 0.2])),
+            ratio=tuple(extra.get('ratio', [0.3, 3.3]))
+        ))
+    return transforms.Compose(t)
 
 def get_data_loaders(config, use_weighted_sampler=False):
-    transform = transforms.Compose([
-        transforms.Resize((224, 224)),
-        transforms.Grayscale(num_output_channels=3),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomRotation(degrees=15),
-        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1),
-        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-    ])
-    train_dataset = Four4All(
-        csv_file=config['data']['train_csv'],
-        img_dir=config['data']['train_dir'],
-        transform=transform
-    )
-    val_dataset = Four4All(
-        csv_file=config['data']['val_csv'],
-        img_dir=config['data']['val_dir'],
-        transform=transform
-    )
-    test_dataset = Four4All(
-        csv_file=config['data']['test_csv'],
-        img_dir=config['data']['test_dir'],
-        transform=transform
-    )
+    # Apply the same transform to all (train/val/test)
+    transform = build_transform(config, is_train=True)
+    train_dataset = Four4All(config['data']['train_csv'], config['data']['train_dir'], transform=transform)
+    val_dataset = Four4All(config['data']['val_csv'], config['data']['val_dir'], transform=transform)
+    test_dataset = Four4All(config['data']['test_csv'], config['data']['test_dir'], transform=transform)
     print(f"\nDataset Statistics:")
     print(f"  Training images: {len(train_dataset)}")
     print(f"  Validation images: {len(val_dataset)}")
@@ -127,31 +125,36 @@ def get_data_loaders(config, use_weighted_sampler=False):
             replacement=True
         )
     train_loader = DataLoader(
-        train_dataset,
-        batch_size=config['data']['batch_size'],
-        shuffle=(train_sampler is None),
-        sampler=train_sampler,
+        train_dataset, batch_size=config['data']['batch_size'],
+        shuffle=(train_sampler is None), sampler=train_sampler,
         num_workers=config['data']['num_workers'],
-        pin_memory=True,
-        worker_init_fn=seed_worker
+        pin_memory=True, worker_init_fn=seed_worker
     )
     val_loader = DataLoader(
-        val_dataset,
-        batch_size=config['data']['batch_size'],
-        shuffle=False,
-        num_workers=config['data']['num_workers'],
-        pin_memory=True,
-        worker_init_fn=seed_worker
+        val_dataset, batch_size=config['data']['batch_size'],
+        shuffle=False, num_workers=config['data']['num_workers'], pin_memory=True, worker_init_fn=seed_worker
     )
     test_loader = DataLoader(
-        test_dataset,
-        batch_size=config['data']['batch_size'],
-        shuffle=False,
-        num_workers=config['data']['num_workers'],
-        pin_memory=True,
-        worker_init_fn=seed_worker
+        test_dataset, batch_size=config['data']['batch_size'],
+        shuffle=False, num_workers=config['data']['num_workers'], pin_memory=True, worker_init_fn=seed_worker
     )
     return train_loader, val_loader, test_loader
+
+def compute_class_weights(train_loader, num_classes=7):
+    print("\nComputing class weights from training data...")
+    class_counts = torch.zeros(num_classes)
+    for _, labels in tqdm(train_loader, desc="Counting classes"):
+        for label in labels:
+            class_counts[label] += 1
+    total_samples = class_counts.sum()
+    class_weights = total_samples / (num_classes * class_counts)
+    class_weights = class_weights / class_weights.sum() * num_classes
+    print("\nClass Distribution in Training Set:")
+    print("-" * 60)
+    for i, (name, count, weight) in enumerate(zip(class_names, class_counts, class_weights)):
+        print(f"{name:10s}: {int(count):6d} samples ({count/total_samples*100:5.2f}%) | Weight: {weight:.4f}")
+    print("-" * 60)
+    return class_weights
 
 def plot_training_curves(train_losses, val_losses, test_losses, train_accs, val_accs, test_accs, config):
     out_dir = config['experiment']['output_dir']
@@ -196,7 +199,7 @@ def train_model(model, train_loader, val_loader, test_loader, config, start_epoc
         optimizer = optim.SGD(
             model.parameters(),
             lr=config['optimizer']['lr'],
-            momentum=config['optimizer']['momentum'],
+            momentum=float(config['optimizer'].get('momentum', 0)),
             weight_decay=config['optimizer']['weight_decay']
         )
     elif opt_type == 'AdamW':
@@ -298,7 +301,6 @@ def train_model(model, train_loader, val_loader, test_loader, config, start_epoc
     plot_training_curves(train_losses, val_losses, test_losses, train_accuracies, val_accuracies, test_accuracies, config)
     return train_losses, val_losses, test_losses, train_accuracies, val_accuracies, test_accuracies, best_val_epoch
 
-# ==================== Final Test Evaluation + Percentage Matrix ====================
 def final_test_evaluation(model, test_loader, config):
     print("\n" + "="*70)
     print("FINAL TEST EVALUATION (best model)")
@@ -327,7 +329,6 @@ def final_test_evaluation(model, test_loader, config):
     print(f"  Recall:    {rec:.4f}")
     print(f"  F1-score:  {f1:.4f}")
 
-
     # Confusion matrix
     cm = confusion_matrix(all_labels, all_preds)
     cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
@@ -337,29 +338,16 @@ def final_test_evaluation(model, test_loader, config):
     sns.heatmap(cm_normalized, annot=True, fmt='.2%', cmap='Blues',
                 xticklabels=class_names, yticklabels=class_names,
                 cbar_kws={'label': 'Percentage'})
-    plt.title(f'Hybrid Model - Test Accuracy: {acc*100:.2f}%\nMacro F1: {f1_macro:.4f}',
-              fontsize=14, fontweight='bold')
+    plt.title("Test Confusion Matrix (%)")
     plt.xlabel('Predicted Label', fontsize=12)
     plt.ylabel('True Label', fontsize=12)
     plt.tight_layout()
-    plt.savefig(f'{cm_path}/confusion_matrix_hybrid.png', dpi=300, bbox_inches='tight')
+    cm_path = os.path.join(config['experiment']['output_dir'], 'confusion_matrix_hybrid.png')
+    plt.savefig(cm_path, dpi=300, bbox_inches='tight')
     print(f"\n✓ Confusion matrix saved to {cm_path}/confusion_matrix_hybrid.png")
     plt.close()
-    # # --- Confusion matrix (percentages per row)
-    # cm = confusion_matrix(all_labels, all_preds)
-    # cm_percent = cm.astype('float') / cm.sum(axis=1, keepdims=True) * 100
-    # plt.figure(figsize=(8, 6))
-    # sns.heatmap(cm_percent, annot=True, fmt='.2%', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
-    # plt.xlabel('Predicted')
-    # plt.ylabel('True')
-    # plt.title("Test Confusion Matrix (%)")
-    # plt.tight_layout()
-    # cm_path = os.path.join(config['experiment']['output_dir'], 'confusion_matrix_hybrid.png')
-    # plt.savefig(cm_path)
-    # plt.close()
-    # print(f"✓ Confusion matrix (percent) saved to {cm_path}")
 
-# ==================== Main Execution ====================
+
 if __name__ == "__main__":
     os.makedirs(config['experiment']['output_dir'], exist_ok=True)
     print("\n" + "="*70)
