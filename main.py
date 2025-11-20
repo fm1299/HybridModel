@@ -70,7 +70,7 @@ class FocalLoss(nn.Module):
 # ==================== Helper Functions ====================
 def build_transform(config, is_train=True):
     aug = config['augmentation']
-    t = [
+    transform = [
         transforms.Resize((aug['img_size'], aug['img_size'])),
         transforms.Grayscale(num_output_channels=3) if aug.get('grayscale', True) else transforms.Lambda(lambda x: x),
         transforms.RandomHorizontalFlip(aug.get('horizontal_flip_prob', 0.5)),
@@ -78,29 +78,29 @@ def build_transform(config, is_train=True):
     ]
     cj = aug.get('color_jitter', {})
     if cj:
-        t.append(transforms.ColorJitter(
+        transform.append(transforms.ColorJitter(
             brightness=cj.get('brightness', 0.0),
             contrast=cj.get('contrast', 0.0),
             saturation=cj.get('saturation', 0.0)
         ))
     aff = aug.get('affine', {})
     if aff:
-        t.append(transforms.RandomAffine(
+        transform.append(transforms.RandomAffine(
             degrees=0,
             translate=(aff.get('translate', 0), aff.get('translate', 0)),
             scale=tuple(aff.get('scale', [1.0, 1.0]))
         ))
-    t.append(transforms.ToTensor())
-    t.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
+    transform.append(transforms.ToTensor())
+    transform.append(transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]))
     # Extra augment: random erasing for train only
-    extra = aug.get('extra_aug', {})
-    if is_train and extra.get('random_erasing', False):
-        t.append(transforms.RandomErasing(
-            p=extra.get('p_erasing', 0.5),
-            scale=tuple(extra.get('scale', [0.02, 0.2])),
-            ratio=tuple(extra.get('ratio', [0.3, 3.3]))
-        ))
-    return transforms.Compose(t)
+    # extra = aug.get('extra_aug', {})
+    # if is_train and extra.get('random_erasing', False):
+    #     t.append(transforms.RandomErasing(
+    #         p=extra.get('p_erasing', 0.5),
+    #         scale=tuple(extra.get('scale', [0.02, 0.2])),
+    #         ratio=tuple(extra.get('ratio', [0.3, 3.3]))
+    #     ))
+    return transforms.Compose(transform)
 
 def get_data_loaders(config, use_weighted_sampler=False):
     # Apply the same transform to all (train/val/test)
