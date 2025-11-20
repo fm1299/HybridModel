@@ -89,6 +89,9 @@ def get_data_loaders(config, use_weighted_sampler=False):
         transforms.Resize((224, 224)),
         transforms.Grayscale(num_output_channels=3),
         transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(degrees=15),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.1),
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), scale=(0.9, 1.1)),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
@@ -323,19 +326,38 @@ def final_test_evaluation(model, test_loader, config):
     print(f"  Precision: {prec:.4f}")
     print(f"  Recall:    {rec:.4f}")
     print(f"  F1-score:  {f1:.4f}")
-    # --- Confusion matrix (percentages per row)
+
+
+    # Confusion matrix
     cm = confusion_matrix(all_labels, all_preds)
-    cm_percent = cm.astype('float') / cm.sum(axis=1, keepdims=True) * 100
-    plt.figure(figsize=(8, 6))
-    sns.heatmap(cm_percent, annot=True, fmt='.2%', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
-    plt.xlabel('Predicted')
-    plt.ylabel('True')
-    plt.title("Test Confusion Matrix (%)")
+    cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+    
+    # Plot confusion matrix
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm_normalized, annot=True, fmt='.2%', cmap='Blues',
+                xticklabels=class_names, yticklabels=class_names,
+                cbar_kws={'label': 'Percentage'})
+    plt.title(f'Hybrid Model - Test Accuracy: {acc*100:.2f}%\nMacro F1: {f1_macro:.4f}',
+              fontsize=14, fontweight='bold')
+    plt.xlabel('Predicted Label', fontsize=12)
+    plt.ylabel('True Label', fontsize=12)
     plt.tight_layout()
-    cm_path = os.path.join(config['experiment']['output_dir'], 'confusion_matrix_hybrid.png')
-    plt.savefig(cm_path)
+    plt.savefig(f'{cm_path}/confusion_matrix_hybrid.png', dpi=300, bbox_inches='tight')
+    print(f"\n✓ Confusion matrix saved to {cm_path}/confusion_matrix_hybrid.png")
     plt.close()
-    print(f"✓ Confusion matrix (percent) saved to {cm_path}")
+    # # --- Confusion matrix (percentages per row)
+    # cm = confusion_matrix(all_labels, all_preds)
+    # cm_percent = cm.astype('float') / cm.sum(axis=1, keepdims=True) * 100
+    # plt.figure(figsize=(8, 6))
+    # sns.heatmap(cm_percent, annot=True, fmt='.2%', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+    # plt.xlabel('Predicted')
+    # plt.ylabel('True')
+    # plt.title("Test Confusion Matrix (%)")
+    # plt.tight_layout()
+    # cm_path = os.path.join(config['experiment']['output_dir'], 'confusion_matrix_hybrid.png')
+    # plt.savefig(cm_path)
+    # plt.close()
+    # print(f"✓ Confusion matrix (percent) saved to {cm_path}")
 
 # ==================== Main Execution ====================
 if __name__ == "__main__":
