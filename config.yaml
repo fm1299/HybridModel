@@ -10,8 +10,8 @@ data:
   val_dir: "rafdb/valid"
   test_csv: "rafdb/test_labels.csv"
   test_dir: "rafdb/test"
-  batch_size: 32
-  num_workers: 4
+  batch_size: 64
+  num_workers: 2
   class_names: ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 
 augmentation:
