@@ -270,7 +270,7 @@ def train_model(model, train_loader, val_loader, test_loader, config, start_epoc
             optimizer.zero_grad()
 
             # main + auxiliary logits from hybrid model
-            logits_main, _, _, logits_cnn_aux, logits_tr_aux = model(
+            logits_main, logits_cnn_aux, logits_tr_aux = model(
                 inputs,
                 return_embeddings=False,
                 return_attention=False,
