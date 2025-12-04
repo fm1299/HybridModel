@@ -415,7 +415,7 @@ def final_test_evaluation(model, test_loader, config):
         xticklabels=class_names, yticklabels=class_names,
         cbar_kws={'label': 'Percentage'}
     )
-    plt.title("Test Confusion Matrix (%)")
+    plt.title("Test Confusion Matrix (%) - Accuracy: {:.2f}%".format(acc * 100), fontsize=16)
     plt.xlabel('Predicted Label', fontsize=12)
     plt.ylabel('True Label', fontsize=12)
     plt.tight_layout()
