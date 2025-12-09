@@ -1,4 +1,4 @@
-print("Starting Hybrid Model training script...")
+print("Starting training script...")
 print("Importing necessary libraries...")
 
 import torch
