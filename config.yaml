@@ -18,7 +18,7 @@ augmentation:
   img_size: 224
   grayscale: true
   horizontal_flip_prob: 0.5
-  rotation_deg: 15
+  rotation_deg: 10
   color_jitter:
     brightness: 0.4
     contrast: 0.4
@@ -55,7 +55,7 @@ loss:
 
 scheduler:
   type: "ReduceLROnPlateau"
-  factor: 0.1
+  factor: 0.5
   patience: 5
   min_lr: 0.0000001
 
