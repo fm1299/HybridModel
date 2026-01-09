@@ -808,8 +808,7 @@ if __name__ == "__main__":
         embed_dim=config['model']['embed_dim'],
         num_heads=config['model']['num_heads'],
         dropout=config['model']['dropout'],
-        pretrained_swin=config['model']['pretrained_swin'],
-        use_gradient_checkpointing=False,
+        pretrained_swin=True,
         aggregation=config['model']['aggregation']
     ).to(device)
     
