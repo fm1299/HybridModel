@@ -394,47 +394,34 @@ def train_model(model, train_loader, val_loader, config, resume_checkpoint=None)
         print(f"\n✓ Using Cross Entropy Loss with class weights (label_smoothing={label_smoothing})")
         criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
     
-    # Optimizer with differential learning rates
-    # Pretrained Swin gets lower LR to preserve learned features
-    # ResEmoteNet and new layers get higher LR to learn faster
+    # Optimizer
     opt_cfg = config['optimizer']
-    base_lr = opt_cfg['lr']
-    swin_lr = base_lr / 10  # 10x lower for pretrained Swin
-    
-    param_groups = [
-        {'params': model.resemotenet.parameters(), 'lr': base_lr, 'name': 'resemotenet'},
-        {'params': model.swin.parameters(), 'lr': swin_lr, 'name': 'swin'},
-        {'params': model.cnn_projection.parameters(), 'lr': base_lr, 'name': 'cnn_projection'},
-        {'params': model.transformer_projection.parameters(), 'lr': base_lr, 'name': 'transformer_projection'},
-        {'params': model.cnn_norm.parameters(), 'lr': base_lr, 'name': 'cnn_norm'},
-        {'params': model.transformer_norm.parameters(), 'lr': base_lr, 'name': 'transformer_norm'},
-        {'params': model.fusion.parameters(), 'lr': base_lr, 'name': 'fusion'},
-        {'params': model.classifier.parameters(), 'lr': base_lr, 'name': 'classifier'},
-    ]
-    
     if opt_cfg['type'] == 'SGD':
         optimizer = optim.SGD(
-            param_groups,
+            model.parameters(),
+            lr=opt_cfg['lr'],
             momentum=opt_cfg.get('momentum', 0.9),
             weight_decay=opt_cfg['weight_decay']
         )
-        print(f"✓ Using SGD with differential LR (base={base_lr}, swin={swin_lr})")
+        print(f"✓ Using SGD optimizer (lr={opt_cfg['lr']}, momentum={opt_cfg.get('momentum', 0.9)})")
     elif opt_cfg['type'] == 'AdamW':
         optimizer = optim.AdamW(
-            param_groups,
+            model.parameters(),
+            lr=opt_cfg['lr'],
             weight_decay=opt_cfg['weight_decay'],
             betas=tuple(opt_cfg.get('betas', [0.9, 0.999]))
         )
-        print(f"✓ Using AdamW with differential LR (base={base_lr}, swin={swin_lr})")
+        print(f"✓ Using AdamW optimizer (lr={opt_cfg['lr']})")
     elif opt_cfg['type'] == 'SAM':
         base_optimizer = optim.SGD
         optimizer = SAM(
-            param_groups,
+            model.parameters(),
             base_optimizer,
+            lr=opt_cfg['lr'],
             momentum=opt_cfg.get('momentum', 0.9),
             weight_decay=opt_cfg['weight_decay']
         )
-        print(f"✓ Using SAM with differential LR (base={base_lr}, swin={swin_lr})")
+        print(f"✓ Using SAM optimizer (lr={opt_cfg['lr']})")
     else:
         raise ValueError(f"Unknown optimizer type: {opt_cfg['type']}")
     
