@@ -173,12 +173,11 @@ def build_train_transform(config):
         brightness = cj.get('brightness', 0.0)
         contrast = cj.get('contrast', 0.0)
         saturation = cj.get('saturation', 0.0)
-        hue = cj.get('hue', 0.0)  # Also support hue if added to config
+        #hue = cj.get('hue', 0.0)  # Also support hue if added to config
         transform_list.append(transforms.ColorJitter(
             brightness=brightness,
             contrast=contrast,
             saturation=saturation,
-            hue=hue
         ))
     
     # Random affine - extract all values from config
@@ -194,31 +193,16 @@ def build_train_transform(config):
             shear=shear
         ))
     
-    # Random autocontrast - extract from config or use default
-    autocontrast_prob = aug.get('autocontrast_prob', 0.3)
-    if autocontrast_prob > 0:
-        transform_list.append(transforms.RandomAutocontrast(p=autocontrast_prob))
+    # # Random autocontrast - extract from config or use default
+    # autocontrast_prob = aug.get('autocontrast_prob', 0.3)
+    # if autocontrast_prob > 0:
+    #     transform_list.append(transforms.RandomAutocontrast(p=autocontrast_prob))
     
     # Convert to tensor and normalize (ImageNet stats for pretrained Swin)
     transform_list.extend([
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
-    
-    # # Random erasing (after ToTensor) - extract all values from config
-    # extra_aug = aug.get('extra_aug', {})
-    # if extra_aug.get('random_erasing', False):
-    #     p_erasing = extra_aug.get('p_erasing', 0.5)
-    #     erasing_scale = tuple(extra_aug.get('scale', [0.02, 0.2]))
-    #     erasing_ratio = tuple(extra_aug.get('ratio', [0.3, 3.3]))
-    #     transform_list.append(transforms.RandomErasing(
-    #         p=p_erasing,
-    #         scale=erasing_scale,
-    #         ratio=erasing_ratio
-    #     ))
-    #     print(f"  Random erasing: p={p_erasing}, scale={erasing_scale}, ratio={erasing_ratio}")
-    
-    # print("=" * 50)
     
     return transforms.Compose(transform_list)
 
@@ -240,7 +224,7 @@ def build_eval_transform(config):
     # Use ImageNet normalization to match training (important for pretrained models)
     transform_list.extend([
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
     ])
     
     return transforms.Compose(transform_list)

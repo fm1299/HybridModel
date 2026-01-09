@@ -10,7 +10,7 @@ data:
   val_dir: "rafdb/valid"
   test_csv: "rafdb/test_labels.csv"
   test_dir: "rafdb/test"
-  batch_size: 64
+  batch_size: 128
   num_workers: 2
   class_names: ["Angry", "Disgust", "Fear", "Happy", "Sad", "Surprise", "Neutral"]
 
@@ -41,7 +41,7 @@ model:
 
 optimizer:
   type: 'SGD'        # Use 'AdamW' or 'SGD'
-  lr: 0.005
+  lr: 0.001
   weight_decay: 0.0001
   momentum: 0.9      # Only for SGD
   betas: [0.9, 0.999] # Only for AdamW
