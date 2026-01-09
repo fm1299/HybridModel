@@ -41,14 +41,14 @@ model:
 
 optimizer:
   type: 'SGD'        # Use 'AdamW' or 'SGD'
-  lr: 0.001
+  lr: 0.005
   weight_decay: 0.0001
   momentum: 0.9      # Only for SGD
   betas: [0.9, 0.999] # Only for AdamW
 
 loss:
   type: 'FocalLoss'   # or 'CrossEntropyLoss'
-  gamma: 2.5          # Only for FocalLoss
+  gamma: 2.0         # Only for FocalLoss
 
 scheduler:
   type: "ReduceLROnPlateau"

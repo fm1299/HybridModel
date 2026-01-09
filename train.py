@@ -82,26 +82,26 @@ if torch.cuda.is_available():
 
 
 # ==================== Reproducibility ====================
-def set_seed(seed=42):
-    """Set random seeds for reproducibility"""
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
-    if torch.cuda.is_available():
-        torch.cuda.manual_seed_all(seed)
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = False
+# def set_seed(seed=42):
+#     """Set random seeds for reproducibility"""
+#     torch.manual_seed(seed)
+#     np.random.seed(seed)
+#     random.seed(seed)
+#     if torch.cuda.is_available():
+#         torch.cuda.manual_seed_all(seed)
+#         torch.backends.cudnn.deterministic = True
+#         torch.backends.cudnn.benchmark = False
 
 
-def seed_worker(worker_id):
-    """Set seed for DataLoader workers"""
-    worker_seed = torch.initial_seed() % 2**32
-    np.random.seed(worker_seed)
-    random.seed(worker_seed)
+# def seed_worker(worker_id):
+#     """Set seed for DataLoader workers"""
+#     worker_seed = torch.initial_seed() % 2**32
+#     np.random.seed(worker_seed)
+#     random.seed(worker_seed)
 
 
-set_seed(config['experiment']['seed'])
-print(f"✓ Random seed set to {config['experiment']['seed']}")
+# set_seed(config['experiment']['seed'])
+# print(f"✓ Random seed set to {config['experiment']['seed']}")
 
 
 # ==================== Focal Loss ====================
@@ -201,7 +201,7 @@ def build_train_transform(config):
     # Convert to tensor and normalize (ImageNet stats for pretrained Swin)
     transform_list.extend([
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     
     return transforms.Compose(transform_list)
@@ -224,7 +224,7 @@ def build_eval_transform(config):
     # Use ImageNet normalization to match training (important for pretrained models)
     transform_list.extend([
         transforms.ToTensor(),
-        transforms.Normalize(mean=[0.5, 0.5, 0.5], std=[0.5, 0.5, 0.5])
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
     
     return transforms.Compose(transform_list)
@@ -262,34 +262,33 @@ def get_data_loaders(config, use_weighted_sampler=False):
     print(f"  Test samples:       {len(test_dataset):,}")
     print(f"  Total:              {len(train_dataset) + len(val_dataset) + len(test_dataset):,}")
     
-    # Weighted sampler for class imbalance
-    train_sampler = None
-    if use_weighted_sampler:
-        print("\n  Using WeightedRandomSampler for balanced batch sampling...")
-        labels = [train_dataset[i][1] for i in range(len(train_dataset))]
-        class_counts = Counter(labels)
-        class_weights_dict = {cls: 1.0 / count for cls, count in class_counts.items()}
-        sample_weights = [class_weights_dict[label] for label in labels]
-        train_sampler = WeightedRandomSampler(
-            weights=sample_weights,
-            num_samples=len(sample_weights),
-            replacement=True
-        )
+    # # Weighted sampler for class imbalance
+    # train_sampler = None
+    # if use_weighted_sampler:
+    #     print("\n  Using WeightedRandomSampler for balanced batch sampling...")
+    #     labels = [train_dataset[i][1] for i in range(len(train_dataset))]
+    #     class_counts = Counter(labels)
+    #     class_weights_dict = {cls: 1.0 / count for cls, count in class_counts.items()}
+    #     sample_weights = [class_weights_dict[label] for label in labels]
+    #     train_sampler = WeightedRandomSampler(
+    #         weights=sample_weights,
+    #         num_samples=len(sample_weights),
+    #         replacement=True
+    #     )
     
     # Generator for reproducible DataLoader
-    g = torch.Generator()
-    g.manual_seed(config['experiment']['seed'])
+    # g = torch.Generator()
+    # g.manual_seed(config['experiment']['seed'])
     
     # Create DataLoaders
     train_loader = DataLoader(
         train_dataset,
         batch_size=config['data']['batch_size'],
-        shuffle=(train_sampler is None),
-        sampler=train_sampler,
+        shuffle=True,
         num_workers=config['data']['num_workers'],
         pin_memory=True,
-        worker_init_fn=seed_worker,
-        generator=g
+        # worker_init_fn=seed_worker,
+        # generator=g
     )
     val_loader = DataLoader(
         val_dataset,
@@ -297,7 +296,7 @@ def get_data_loaders(config, use_weighted_sampler=False):
         shuffle=False,
         num_workers=config['data']['num_workers'],
         pin_memory=True,
-        worker_init_fn=seed_worker
+        #worker_init_fn=seed_worker
     )
     test_loader = DataLoader(
         test_dataset,
@@ -305,7 +304,7 @@ def get_data_loaders(config, use_weighted_sampler=False):
         shuffle=False,
         num_workers=config['data']['num_workers'],
         pin_memory=True,
-        worker_init_fn=seed_worker
+        #worker_init_fn=seed_worker
     )
     
     return train_loader, val_loader, test_loader
