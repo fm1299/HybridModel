@@ -63,6 +63,7 @@ class ResEmoteNetBackbone(nn.Module):
         self.bn3 = nn.BatchNorm2d(256)
         self.maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.se_block = SqueezeExcitationBlock(256, reduction=16)
+        self.spatial_dropout = nn.Dropout(0.2)
         self.res_block1 = ResidualBlock(256, 512, stride=2)
         self.res_block2 = ResidualBlock(512, 1024, stride=2)
         self.res_block3 = ResidualBlock(1024, 2048, stride=2)
@@ -78,8 +79,10 @@ class ResEmoteNetBackbone(nn.Module):
     def forward(self, x):
         x = self.relu(self.bn1(self.conv1(x)))
         x = self.maxpool1(x)
+        x = self.spatial_dropout(x)
         x = self.relu(self.bn2(self.conv2(x)))
         x = self.maxpool2(x)
+        x = self.spatial_dropout(x)
         x = self.relu(self.bn3(self.conv3(x)))
         x = self.maxpool3(x)
         x = self.se_block(x)
@@ -89,67 +92,6 @@ class ResEmoteNetBackbone(nn.Module):
         x = self.global_pool(x)
         x = torch.flatten(x, 1)  # (batch, 2048)
         return x
-
-
-
-# class ResEmoteNetBackbone(nn.Module):
-#     """
-#     Paper-faithful ResEmoteNet backbone for hybrid models.
-#     Outputs 2048-dimensional features, matching the original architecture.
-#     """
-#     def __init__(self, input_channels: int = 3):
-#         super().__init__()
-#         self.conv1 = nn.Conv2d(input_channels, 64, kernel_size=3, stride=1, padding=1, bias=False)
-#         self.bn1 = nn.BatchNorm2d(64)
-#         self.relu = nn.ReLU(inplace=True)
-#         self.maxpool1 = nn.MaxPool2d(2, 2) # 224 -> 112
-
-#         self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=1, padding=1, bias=False)
-#         self.bn2 = nn.BatchNorm2d(128)
-#         self.maxpool2 = nn.MaxPool2d(2, 2) # 112 -> 56
-        
-#         self.conv3 = nn.Conv2d(128, 256, kernel_size=3, stride=1, padding=1, bias=False)
-#         self.bn3 = nn.BatchNorm2d(256)
-#         self.maxpool3 = nn.MaxPool2d(2, 2) # 56 -> 28
-
-#         self.se_block = SqueezeExcitationBlock(256, reduction=16)
-
-#         # Residual blocks: 256→512 (stride 2), 512→1024 (stride 2), 1024→2048 (stride 2)
-#         self.res_block1 = ResidualBlock(256, 512, stride=2)   # 28→14
-#         self.res_block2 = ResidualBlock(512, 1024, stride=2)  # 14→7
-#         self.res_block3 = ResidualBlock(1024, 2048, stride=2) # 7→4
-
-#         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
-
-#         self._initialize_weights()
-
-#     def _initialize_weights(self):
-#         for m in self.modules():
-#             if isinstance(m, nn.Conv2d):
-#                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
-#             elif isinstance(m, nn.BatchNorm2d):
-#                 nn.init.constant_(m.weight, 1)
-#                 nn.init.constant_(m.bias, 0)
-
-#     def forward(self, x):
-#         x = self.relu(self.bn1(self.conv1(x)))
-#         x = self.maxpool1(x)
-#         x = self.relu(self.bn2(self.conv2(x)))
-#         x = self.maxpool2(x)
-#         x = self.relu(self.bn3(self.conv3(x)))
-#         x = self.maxpool3(x)
-#         x = self.se_block(x)
-
-#         x = self.res_block1(x)
-#         x = self.res_block2(x)
-#         x = self.res_block3(x)
-#         x = self.global_pool(x)
-#         x = torch.flatten(x, 1)  # (batch, 2048)
-#         return x
-
-
-
-
 
 # ==================== Multi-Head Attention Fusion Module ====================
 

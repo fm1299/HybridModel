@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -46,7 +47,7 @@ class ResidualBlock(nn.Module):
 class ResEmoteNet(nn.Module):
     def __init__(self):
         super(ResEmoteNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
         self.bn1 = nn.BatchNorm2d(64)
         self.conv2 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
         self.bn2 = nn.BatchNorm2d(128)
@@ -54,32 +55,41 @@ class ResEmoteNet(nn.Module):
         self.bn3 = nn.BatchNorm2d(256)
         self.relu = nn.ReLU(inplace=True)
         self.se = SEBlock(256)
-
-        self.res_block1 = ResidualBlock(256, 256)
-        self.res_block2 = ResidualBlock(256, 512, stride=2)
-        self.res_block3 = ResidualBlock(512, 512)
-
+        
+        self.res_block1 = ResidualBlock(256, 512, stride=2)
+        self.res_block2 = ResidualBlock(512, 1024, stride=2)
+        self.res_block3 = ResidualBlock(1024, 2048, stride=2)
+        
         self.pool = nn.AdaptiveAvgPool2d((1, 1))
-        self.fc1 = nn.Linear(512, 256)
-        self.dropout = nn.Dropout(0.5)
-        self.fc2 = nn.Linear(256, 7)
-
+        self.fc1 = nn.Linear(2048, 1024)
+        self.fc2 = nn.Linear(1024, 512)
+        self.fc3 = nn.Linear(512, 256)
+        self.dropout1 = nn.Dropout(0.2)
+        self.dropout2 = nn.Dropout(0.5)
+        self.fc4 = nn.Linear(256, 7)
+        
     def forward(self, x):
         x = F.relu(self.bn1(self.conv1(x)))
         x = F.max_pool2d(x, 2)
+        x = self.dropout1(x)
         x = F.relu(self.bn2(self.conv2(x)))
         x = F.max_pool2d(x, 2)
+        x = self.dropout1(x)
         x = F.relu(self.bn3(self.conv3(x)))
         x = F.max_pool2d(x, 2)
         x = self.se(x)
-
+        
         x = self.res_block1(x)
         x = self.res_block2(x)
         x = self.res_block3(x)
-
+        
         x = self.pool(x)
         x = x.view(x.size(0), -1)
         x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
+        x = self.dropout2(x)
+        x = F.relu(self.fc2(x))
+        x = self.dropout2(x)
+        x = F.relu(self.fc3(x))
+        x = self.dropout2(x)
+        x = self.fc4(x)
         return x
