@@ -63,7 +63,6 @@ class ResEmoteNetBackbone(nn.Module):
         self.bn3 = nn.BatchNorm2d(256)
         self.maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2)
         self.se_block = SqueezeExcitationBlock(256, reduction=16)
-        self.spatial_dropout = nn.Dropout(0.2)
         self.res_block1 = ResidualBlock(256, 512, stride=2)
         self.res_block2 = ResidualBlock(512, 1024, stride=2)
         self.res_block3 = ResidualBlock(1024, 2048, stride=2)
@@ -79,10 +78,8 @@ class ResEmoteNetBackbone(nn.Module):
     def forward(self, x):
         x = self.relu(self.bn1(self.conv1(x)))
         x = self.maxpool1(x)
-        x = self.spatial_dropout(x)
         x = self.relu(self.bn2(self.conv2(x)))
         x = self.maxpool2(x)
-        x = self.spatial_dropout(x)
         x = self.relu(self.bn3(self.conv3(x)))
         x = self.maxpool3(x)
         x = self.se_block(x)

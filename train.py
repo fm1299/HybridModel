@@ -159,13 +159,18 @@ def build_train_transform(config):
     if grayscale:
         transform_list.append(transforms.Grayscale(num_output_channels=3))
     
-    # Horizontal flip - extract from config
-    h_flip_prob = aug.get('horizontal_flip_prob', 0.5)
-    transform_list.append(transforms.RandomHorizontalFlip(p=h_flip_prob))
-    
     # Random rotation - extract from config
     rotation_deg = aug.get('rotation_deg', 10)
     transform_list.append(transforms.RandomRotation(degrees=rotation_deg))
+
+    # Horizontal flip - extract from config
+    h_flip_prob = aug.get('horizontal_flip_prob', 0.5)
+    transform_list.append(transforms.RandomHorizontalFlip(p=h_flip_prob))
+
+    # Random autocontrast - extract from config or use default
+    autocontrast_prob = aug.get('autocontrast_prob', 0.3)
+    if autocontrast_prob > 0:
+        transform_list.append(transforms.RandomAutocontrast(p=autocontrast_prob))
     
     # Color jitter - extract all values from config
     cj = aug.get('color_jitter', {})
@@ -192,11 +197,6 @@ def build_train_transform(config):
             scale=scale_range,
             shear=shear
         ))
-    
-    # # Random autocontrast - extract from config or use default
-    # autocontrast_prob = aug.get('autocontrast_prob', 0.3)
-    # if autocontrast_prob > 0:
-    #     transform_list.append(transforms.RandomAutocontrast(p=autocontrast_prob))
     
     # Convert to tensor and normalize (ImageNet stats for pretrained Swin)
     transform_list.extend([
