@@ -37,7 +37,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.nn.functional as F
-from torch.utils.data import DataLoader, WeightedRandomSampler
+from torch.utils.data import DataLoader
 from torchvision import transforms
 from torch.optim.lr_scheduler import ReduceLROnPlateau, CosineAnnealingWarmRestarts
 from tqdm import tqdm
@@ -390,8 +390,9 @@ def train_model(model, train_loader, val_loader, config, resume_checkpoint=None)
         print(f"\n✓ Using Focal Loss (gamma={focal_gamma}) with class weights")
         criterion = FocalLoss(alpha=class_weights, gamma=focal_gamma, reduction='mean')
     else:
-        print("\n✓ Using Cross Entropy Loss with class weights")
-        criterion = nn.CrossEntropyLoss(weight=class_weights)
+        label_smoothing = config['loss'].get('label_smoothing', 0.0)
+        print(f"\n✓ Using Cross Entropy Loss with class weights (label_smoothing={label_smoothing})")
+        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=label_smoothing)
     
     # Optimizer
     opt_cfg = config['optimizer']
@@ -677,16 +678,8 @@ def evaluate_model(model, data_loader, split_name='Test'):
     print(f"  F1 Score (Macro): {f1_macro:.4f}")
     print(f"  F1 Score (Weighted): {f1_weighted:.4f}")
     
-    print(f"\nPer-Class Metrics:")
-    print(f"  {'Class':<12} {'Precision':>10} {'Recall':>10} {'F1-Score':>10} {'Support':>10}")
-    print("  " + "-" * 52)
-    
-    cm = confusion_matrix(all_labels, all_preds)
-    for i, name in enumerate(CLASS_NAMES):
-        support = cm[i].sum()
-        print(f"  {name:<12} {precision_per_class[i]:>10.4f} {recall_per_class[i]:>10.4f} {f1_per_class[i]:>10.4f} {support:>10}")
-    
     # Confusion matrix visualization
+    cm = confusion_matrix(all_labels, all_preds)
     cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
     
     plt.figure(figsize=(12, 10))
@@ -835,7 +828,6 @@ if __name__ == "__main__":
         print(f"\n✓ Loaded best model for final evaluation")
     
     # Evaluate on all splits
-    val_results = evaluate_model(model, val_loader, 'Validation')
     test_results = evaluate_model(model, test_loader, 'Test')
     
     # ============ Save Final Model ============
@@ -843,7 +835,6 @@ if __name__ == "__main__":
     torch.save({
         'model_state_dict': model.state_dict(),
         'config': config,
-        'val_results': val_results,
         'test_results': test_results
     }, final_model_path)
     print(f"\n✓ Final model saved to {final_model_path}")
