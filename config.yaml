@@ -61,6 +61,7 @@ training:
   epochs: 60
   patience: 20
   gradient_clip: 1.0
+  aux_weight: 0.3        # Weight for auxiliary head losses (0.0 to disable)
   resume_checkpoint: null
 
 evaluation:
