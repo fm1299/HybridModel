@@ -276,31 +276,11 @@ class HybridEmotionRecognition(nn.Module):
             nn.Linear(embed_dim // 2, num_classes)
         )
         
-        # ============ Auxiliary Classifiers (for training) ============
-        # Direct supervision for each branch improves gradient flow
-        self.cnn_aux_classifier = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim // 4),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(embed_dim // 4, num_classes)
-        )
-        
-        self.transformer_aux_classifier = nn.Sequential(
-            nn.Linear(embed_dim, embed_dim // 4),
-            nn.GELU(),
-            nn.Dropout(dropout),
-            nn.Linear(embed_dim // 4, num_classes)
-        )
-        
         self._initialize_weights()
     
     def _initialize_weights(self):
         """Initialize projection and classification layers using Xavier initialization"""
-        modules_to_init = [
-            self.cnn_projection, self.transformer_projection, self.classifier,
-            self.cnn_aux_classifier, self.transformer_aux_classifier
-        ]
-        for module in modules_to_init:
+        for module in [self.cnn_projection, self.transformer_projection, self.classifier]:
             for layer in module.modules():
                 if isinstance(layer, nn.Linear):
                     nn.init.xavier_uniform_(layer.weight)
@@ -310,8 +290,7 @@ class HybridEmotionRecognition(nn.Module):
     def forward(self, 
                 x: torch.Tensor, 
                 return_embeddings: bool = False, 
-                return_attention: bool = False,
-                return_aux: bool = False) -> Union[torch.Tensor, Tuple]:
+                return_attention: bool = False) -> Union[torch.Tensor, Tuple]:
         """
         Forward pass through the hybrid model
         
@@ -319,11 +298,9 @@ class HybridEmotionRecognition(nn.Module):
             x: Input images (batch_size, 3, 224, 224)
             return_embeddings: Return intermediate embeddings for analysis
             return_attention: Return attention weights for visualization
-            return_aux: Return auxiliary predictions for training
         
         Returns:
             logits: Class predictions (batch_size, num_classes)
-            aux_logits: Dict with CNN and Transformer aux predictions (if return_aux=True)
             embeddings: Dict of intermediate embeddings (optional)
             attention_weights: Attention weights (optional)
         """
@@ -355,16 +332,6 @@ class HybridEmotionRecognition(nn.Module):
         
         # Prepare return values
         output = [logits]
-        
-        # Auxiliary predictions for training
-        if return_aux:
-            cnn_aux_logits = self.cnn_aux_classifier(cnn_embed)
-            transformer_aux_logits = self.transformer_aux_classifier(transformer_embed)
-            aux_logits = {
-                'cnn': cnn_aux_logits,
-                'transformer': transformer_aux_logits
-            }
-            output.append(aux_logits)
         
         if return_embeddings:
             embeddings = {
@@ -445,8 +412,6 @@ class HybridEmotionRecognition(nn.Module):
             'transformer_norm': sum(p.numel() for p in self.transformer_norm.parameters()),
             'fusion_module': sum(p.numel() for p in self.fusion.parameters()),
             'classifier': sum(p.numel() for p in self.classifier.parameters()),
-            'cnn_aux_classifier': sum(p.numel() for p in self.cnn_aux_classifier.parameters()),
-            'transformer_aux_classifier': sum(p.numel() for p in self.transformer_aux_classifier.parameters()),
             'total': self.get_num_params(),
             'trainable': self.get_trainable_params()
         }

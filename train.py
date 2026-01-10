@@ -379,11 +379,8 @@ def train_model(model, train_loader, val_loader, config, resume_checkpoint=None)
     num_epochs = config['training']['epochs']
     patience = config['training']['patience']
     gradient_clip = config['training'].get('gradient_clip', 1.0)
-    aux_weight = config['training'].get('aux_weight', 0.3)  # Weight for auxiliary losses
     use_focal_loss = config['loss']['type'] == 'FocalLoss'
     focal_gamma = config['loss'].get('gamma', 2.0)
-    
-    print(f"\n✓ Using auxiliary heads with weight={aux_weight}")
     
     # Compute class weights
     class_weights = compute_class_weights(train_loader, NUM_CLASSES).to(device)
@@ -498,25 +495,19 @@ def train_model(model, train_loader, val_loader, config, resume_checkpoint=None)
             
             if opt_cfg['type'] == 'SAM':
                 # SAM requires two forward-backward passes
-                outputs, aux_outputs = model(inputs, return_aux=True)
-                main_loss = criterion(outputs, labels)
-                aux_loss = criterion(aux_outputs['cnn'], labels) + criterion(aux_outputs['transformer'], labels)
-                loss = main_loss + aux_weight * aux_loss
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
                 loss.backward()
                 optimizer.first_step()
                 
-                outputs, aux_outputs = model(inputs, return_aux=True)
-                main_loss = criterion(outputs, labels)
-                aux_loss = criterion(aux_outputs['cnn'], labels) + criterion(aux_outputs['transformer'], labels)
-                (main_loss + aux_weight * aux_loss).backward()
+                outputs = model(inputs)
+                criterion(outputs, labels).backward()
                 optimizer.second_step()
                 optimizer.zero_grad()
             else:
                 optimizer.zero_grad()
-                outputs, aux_outputs = model(inputs, return_aux=True)
-                main_loss = criterion(outputs, labels)
-                aux_loss = criterion(aux_outputs['cnn'], labels) + criterion(aux_outputs['transformer'], labels)
-                loss = main_loss + aux_weight * aux_loss
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
                 loss.backward()
                 torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=gradient_clip)
                 optimizer.step()
