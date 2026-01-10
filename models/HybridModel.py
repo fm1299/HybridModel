@@ -231,10 +231,10 @@ class HybridEmotionRecognition(nn.Module):
         self.resemotenet = ResEmoteNetBackbone(input_channels=3)
         resemotenet_dim = 2048  # Output dimension of ResEmoteNet
         
-        # ============ Branch 2: Swin Transformer Tiny ============
-        # Load Swin Transformer Tiny (expects 224x224 images)
+        # ============ Branch 2: Swin Transformer Small ============
+        # Load Swin Transformer Small (expects 224x224 images)
         self.swin = timm.create_model(
-            'swin_tiny_patch4_window7_224',
+            'swin_small_patch4_window7_224',
             pretrained=pretrained_swin,
             num_classes=0  # Remove classification head
         )
