@@ -172,31 +172,31 @@ def build_train_transform(config):
     if autocontrast_prob > 0:
         transform_list.append(transforms.RandomAutocontrast(p=autocontrast_prob))
     
-    # Color jitter - extract all values from config
-    cj = aug.get('color_jitter', {})
-    if cj:
-        brightness = cj.get('brightness', 0.0)
-        contrast = cj.get('contrast', 0.0)
-        saturation = cj.get('saturation', 0.0)
-        #hue = cj.get('hue', 0.0)  # Also support hue if added to config
-        transform_list.append(transforms.ColorJitter(
-            brightness=brightness,
-            contrast=contrast,
-            saturation=saturation,
-        ))
+    # # Color jitter - extract all values from config
+    # cj = aug.get('color_jitter', {})
+    # if cj:
+    #     brightness = cj.get('brightness', 0.0)
+    #     contrast = cj.get('contrast', 0.0)
+    #     saturation = cj.get('saturation', 0.0)
+    #     #hue = cj.get('hue', 0.0)  # Also support hue if added to config
+    #     transform_list.append(transforms.ColorJitter(
+    #         brightness=brightness,
+    #         contrast=contrast,
+    #         saturation=saturation,
+    #     ))
     
-    # Random affine - extract all values from config
-    aff = aug.get('affine', {})
-    if aff:
-        translate_val = aff.get('translate', 0.1)
-        scale_range = tuple(aff.get('scale', [0.9, 1.1]))
-        shear = aff.get('shear', None)  # Also support shear if added to config
-        transform_list.append(transforms.RandomAffine(
-            degrees=0,
-            translate=(translate_val, translate_val),
-            scale=scale_range,
-            shear=shear
-        ))
+    # # Random affine - extract all values from config
+    # aff = aug.get('affine', {})
+    # if aff:
+    #     translate_val = aff.get('translate', 0.1)
+    #     scale_range = tuple(aff.get('scale', [0.9, 1.1]))
+    #     shear = aff.get('shear', None)  # Also support shear if added to config
+    #     transform_list.append(transforms.RandomAffine(
+    #         degrees=0,
+    #         translate=(translate_val, translate_val),
+    #         scale=scale_range,
+    #         shear=shear
+    #     ))
     
     # Convert to tensor and normalize (ImageNet stats for pretrained Swin)
     transform_list.extend([
